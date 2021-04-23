@@ -25,6 +25,7 @@ namespace echo_func
         [FunctionName("who")]
         public static IActionResult ReadAuthorizationHeader([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "who")] HttpRequest request, ILogger log)
         {
+            //Microsoft.IdentityModel.Logging.IdentityModelEventSource.ShowPII = false; // for returning exceptions
             if (!request.Headers.ContainsKey("Authorization"))
             {
                 return new OkObjectResult(new { Message = "No header" });
@@ -40,10 +41,18 @@ namespace echo_func
             }
 
             var jwtHandler = new JwtSecurityTokenHandler();
+
             if (jwtHandler.CanReadToken(headerParts[1]))
             {
-                var token = jwtHandler.ReadJwtToken(headerParts[1]);
-                return new OkObjectResult(token.Claims.Select(x => new { x.Type, x.Value }));
+                try
+                {
+                    var token = jwtHandler.ReadJwtToken(headerParts[1]);
+                    return new OkObjectResult(token.Claims.Select(x => new { x.Type, x.Value }));
+                }
+                catch (System.Exception ex)
+                {
+                    return new BadRequestObjectResult(new { Message = $"Authorization header value is malformed; {ex.Message}", Data = GetHeadersAndParams(request) });
+                }
             }
             return new BadRequestObjectResult(new { Message = "Something went wrong" });
         }
